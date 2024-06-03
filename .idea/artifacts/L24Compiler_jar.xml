@@ -1,0 +1,11 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="L24Compiler:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/L24Compiler_jar</output-path>
+    <root id="archive" name="L24Compiler.jar">
+      <element id="directory" name="META-INF">
+        <element id="file-copy" path="$PROJECT_DIR$/src/META-INF/MANIFEST.MF" />
+      </element>
+      <element id="module-output" name="L24Compiler" />
+    </root>
+  </artifact>
+</component>

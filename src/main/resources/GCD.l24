@@ -1,0 +1,16 @@
+var a,b,tmp;
+main{
+    scan(a,b);
+    if(a<b)then{
+        tmp=a;
+        a=b;
+        b=tmp;
+    }end;
+    while(b!=0)
+    {
+        tmp=a-a/b*b ;
+        a=b;
+        b=tmp;
+    };
+    print(a);
+}

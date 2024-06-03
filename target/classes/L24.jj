@@ -1,0 +1,407 @@
+options {
+    STATIC = false;
+    LOOKAHEAD = 2;
+    FORCE_LA_CHECK = true;
+}
+PARSER_BEGIN(L24)
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.util.ArrayList;
+
+public class L24 {
+
+    public static void main(String args[]) throws ParseException {
+            try {
+                InputStream inputstream = new FileInputStream("src/main/resources/ValueJug.l24");
+                L24 parser = new L24(inputstream);
+                parser.Program();
+            }catch (Exception e){
+                System.err.println(e);
+            }
+        }
+    /**全局字母表*/
+    public static ArrayList<Symbol> list = new ArrayList();
+    /**中间代码表*/
+    public static ArrayList<MiddleCode> midCodeList = new ArrayList();
+    /**
+      * @Description: 添加符号表
+      * @author LuoTianYi
+      *
+    **/
+    public static void addSymbol(Token t){
+        Symbol s = new Symbol(SymbolType.intSym);
+        s.setName(t.image);//Token的实际文本
+        for(int i = 0; i < list.size(); i++){
+            if (list.get(i).getName().equals(s.getName())) {
+                ErrorExecute.showErrMsg(1,"变量重复声明");
+            }
+        }
+        list.add(s);
+    }
+    /**
+      * @Description: 输出中间代码内容
+      * @author LuoTianYi
+      *
+    **/
+    public static void outPutMiddleCodeList(){
+        for(int i = 0; i < midCodeList.size(); i++) {
+            MiddleCode m = midCodeList.get(i);
+            System.out.println(m.toString());
+        }
+    }
+    /**
+      * @Description: 请求数据空间
+      * @author LuoTianYi
+      *
+    **/
+    public static void askForSpace(){
+        if(list.size()>100){
+            ErrorExecute.showErrMsg(6,"符号表溢出");
+            //超过字母表最大容量
+        }
+        MiddleCode code = new MiddleCode(MiddleCode.CodeType.INT,0,list.size());
+        midCodeList.add(code);
+    }
+    /**
+      * @Description 输出中间代码到指定文件
+      * @return
+      * @author LuoTianYi
+      *
+    **/
+    public static void outPutGoalCode(){
+        FileOutputStream out;
+        try{
+            out = new FileOutputStream("src/main/resources/output.txt");
+            for(int i = 0; i < midCodeList.size(); i++) {
+              MiddleCode code = midCodeList.get(i);
+              out.write(code.toString().getBytes("GBK"));
+              out.write("\r\n".getBytes("GBK"));
+            }
+            out.close();
+        }catch (Exception e){
+            ErrorExecute.showErrMsg(7,"文件输出错误");
+        }
+    }
+    /**
+      * @Description 给符号表变量赋值或取变量值
+      * @param 取0:LOD 取1:STO
+      * @return
+      * @author LuoTianYi
+      *
+    **/
+    public static void getVariableById(Token t, int type){
+        String id = t.image;
+        boolean isFind = false;
+        int relative = -1;
+        for(int i = 0; i < list.size(); i++) {
+          if(list.get(i).getType()==SymbolType.intSym){
+                relative++;
+                if(list.get(i).getName().equals(id)){
+                    isFind = true;
+                    if(list.get(i).getValue()>Integer.MAX_VALUE||list.get(i).getValue()<Integer.MIN_VALUE){
+                        ErrorExecute.showErrMsg(5,"变量溢出");
+                        //变量溢出
+                    }
+                    if(type==0){
+                        MiddleCode code = new MiddleCode(MiddleCode.CodeType.LOD,0,relative);
+                        midCodeList.add(code);
+                    }
+                    else{
+                        MiddleCode code = new MiddleCode(MiddleCode.CodeType.STO,0,relative);
+                        midCodeList.add(code);
+                    }
+                }
+          }
+        }
+        if(!isFind){
+            ErrorExecute.showErrMsg(0,"变量未声明");
+            //变量未声明
+        }
+    }
+}
+
+PARSER_END(L24)
+
+SKIP : {
+ " "
+|"\t"
+|"\n"
+|"\r"
+}
+/**运算符*/
+TOKEN : {
+    <PLUS: "+">
+|   <MINUS: "-">
+|   <MUL: "*">
+|   <DIV: "/">
+|   <EQL: "==">
+|   <ASSIGN: "=">
+|   <NEQ: "!=">
+|   <LSS: "<">
+|   <GTR: ">">
+|   <LEQ: "<=">
+|   <GEQ: ">=">
+|   <LPA: "(">
+|   <RPA: ")">
+|   <LCURLY: "{">
+|   <RCURLY: "}">
+|   <SEMICOLON: ";">
+|   <COMMA: ",">
+}
+/**保留字*/
+TOKEN : {
+    <IF:"if">
+|   <ELSE:"else">
+|   <THEN:"then">
+|   <WHILE:"while">
+|   <END:"end">
+|   <MAIN:"main">
+|   <SCAN:"scan">
+|   <PRINT:"print">
+|   <VAR:"var">
+}
+
+/**标识符*/
+TOKEN : {
+    <NUMBER: (<DIGIT>)+>
+|   <IDENT: (<LETTER>|"_")+(<LETTER>| <DIGIT>| "_")*>
+|   <#LETTER: ["a"-"z", "A"-"Z"]>
+|   <#DIGIT: ["0"-"9"]>
+}
+void Program():
+{}
+{   //[<definition>]  <main>
+    [Definition()]
+    MainFunction()
+    <EOF>{
+    //outPutGoalCode();
+    //outPutMiddleCodeList();
+    }
+}
+void Definition():
+{
+    Token s;
+}
+{
+    //"var" <ident> {"," <ident>} ";"
+    <VAR>
+    s=<IDENT>{addSymbol(s);}
+    (<COMMA>
+    s=<IDENT>{addSymbol(s);}
+    )*
+    <SEMICOLON>{askForSpace();}
+}
+void MainFunction():
+{}
+{
+    //"main" "{" <stmt_list> "}"
+    <MAIN><LCURLY> Statement_list() <RCURLY>
+}
+void Statement_list():
+{}
+{   //{<stmt> ";"}
+    (Statement() <SEMICOLON>)*
+}
+void Statement():
+{}
+{
+    //<assign_stmt>|<if_stmt>|<while_stmt>|<scan_stmt>|<print_stmt>
+        AssignmentStatement()
+    |
+        IfStatement()
+    |
+        WhileStatement()
+    |
+        ScanStatement()
+    |
+        PrintStatement()
+
+}
+void AssignmentStatement():
+{
+    Token s;
+}
+{   //<ident> "=" <expr>
+    s=<IDENT> <ASSIGN> Expression(){
+        getVariableById(s,1);
+}
+}
+void IfStatement():
+{
+    int jpcAddress;
+    int jmpAddress;
+}{
+    //"if" "(" <bool_expr> ")" "then" "{" <stmt _list> "}" ["else" "{" <stmt_list> "}"] "end"
+    <IF> <LPA> BoolExpression(){
+        MiddleCode code = new MiddleCode(MiddleCode.CodeType.JPC,0,0);
+        midCodeList.add(code);
+        jpcAddress = midCodeList.size()-1;
+} <RPA> <THEN> <LCURLY> Statement_list(){
+        MiddleCode code2 = new MiddleCode(MiddleCode.CodeType.JMP,0,midCodeList.size()+1);
+        midCodeList.add(code2);
+        midCodeList.get(jpcAddress).a = midCodeList.size();
+        jmpAddress = midCodeList.size()-1;
+} <RCURLY>
+[
+    <ELSE> <LCURLY> Statement_list(){
+        midCodeList.get(jmpAddress).a = midCodeList.size();
+}
+    <RCURLY>
+]
+    <END>
+}
+void WhileStatement():
+{   int beginAddress;
+    int jpcAddress;
+    int endAddress;
+}
+{
+    //"while" "(" <bool_expr> ")" "{" <stmt _list> "}"
+    <WHILE>{beginAddress = midCodeList.size();}
+    <LPA> BoolExpression(){
+        MiddleCode code = new MiddleCode(MiddleCode.CodeType.JPC,0,0);
+        midCodeList.add(code);
+        jpcAddress = midCodeList.size()-1;
+}   <RPA>
+    <LCURLY> Statement_list(){
+        MiddleCode code2 = new MiddleCode(MiddleCode.CodeType.JMP,0,beginAddress);
+        midCodeList.add(code2);
+        midCodeList.get(jpcAddress).a = midCodeList.size();
+}   <RCURLY>
+}
+void ScanStatement():{
+        Token t;
+}
+{
+        //"scan" "(" <ident> {"," <ident>} ")"
+        <SCAN> <LPA> t=<IDENT>{
+            MiddleCode code = new MiddleCode(MiddleCode.CodeType.OPR,0,16);
+            midCodeList.add(code);
+            getVariableById(t,1);
+}       (<COMMA> t=<IDENT>{
+            MiddleCode code1 = new MiddleCode(MiddleCode.CodeType.OPR,0,16);
+            midCodeList.add(code1);
+            getVariableById(t,1);
+})*     <RPA>
+}
+void PrintStatement():
+{
+        Token t;
+}
+{
+        //"print" "(" <expr> {"," <expr>} ")"
+        <PRINT> <LPA> Expression() {
+            MiddleCode code = new MiddleCode(MiddleCode.CodeType.OPR,0,14);
+            midCodeList.add(code);
+            }
+        (<COMMA> Expression(){
+            MiddleCode code1 = new MiddleCode(MiddleCode.CodeType.OPR,0,14);
+            midCodeList.add(code1);
+            }
+        )*
+        <RPA>
+}
+void BoolExpression():
+{
+    Token t;
+}
+{
+    //<expr> ("=="|"!="|"<"|"<="|">"|">=") <expr>
+    Expression()(t=<EQL>|t=<NEQ>|t=<LSS>|t=<LEQ>|t=<GTR>|t=<GEQ>)
+    Expression(){
+        MiddleCode code;
+        switch (t.image){
+            case "==":
+                code = new MiddleCode(MiddleCode.CodeType.OPR,0,8);
+                midCodeList.add(code);
+                break;
+            case "!=":
+                code = new MiddleCode(MiddleCode.CodeType.OPR,0,9);
+                midCodeList.add(code);
+                break;
+            case "<":
+                code = new MiddleCode(MiddleCode.CodeType.OPR,0,10);
+                midCodeList.add(code);
+                break;
+            case "<=":
+                code = new MiddleCode(MiddleCode.CodeType.OPR,0,11);
+                midCodeList.add(code);
+                break;
+            case ">":
+                code = new MiddleCode(MiddleCode.CodeType.OPR,0,12);
+                midCodeList.add(code);
+                break;
+            case ">=":
+                code = new MiddleCode(MiddleCode.CodeType.OPR,0,13);
+                midCodeList.add(code);
+                break;
+            default:
+                break;
+    }
+    }
+}
+void Expression():
+{
+    Token t;
+}
+{
+    //["+"|"-"] <term> {("+"|"-")<term>}
+    [<PLUS>|<MINUS>] Term() ((
+    t=<PLUS>|t=<MINUS>) Term()
+    {
+        if(t.image.equals("+")){
+            MiddleCode code = new MiddleCode(MiddleCode.CodeType.OPR,0,2);
+            midCodeList.add(code);
+        }
+        else{
+            MiddleCode code = new MiddleCode(MiddleCode.CodeType.OPR,0,3);
+            midCodeList.add(code);
+        }
+    }
+    )*
+}
+void Term():
+{
+    Token t;
+}
+{
+    //<factor>{("*"|"")<factor>}
+    Factor() ((
+    t=<MUL>|t=<DIV>)Factor()
+    {
+        if(t.image.equals("*")){
+            MiddleCode code = new MiddleCode(MiddleCode.CodeType.OPR,0,4);
+            midCodeList.add(code);
+        }
+        else{
+            MiddleCode code1 = new MiddleCode(MiddleCode.CodeType.OPR,0,5);
+            midCodeList.add(code1);
+        }
+    }
+    )*
+}
+void Factor():
+{
+    Token s;
+}
+{
+    //<ident>|<number>|"("<expr>"}"
+    (
+        s=<IDENT>{
+            getVariableById(s,0);
+}
+
+    |
+        s=<NUMBER>{
+            if(Integer.parseInt(s.image)>Integer.MAX_VALUE||Integer.parseInt(s.image)<-Integer.MIN_VALUE){
+                ErrorExecute.showErrMsg(5,"变量溢出");
+                //超出最大值
+            }
+            MiddleCode code = new MiddleCode(MiddleCode.CodeType.LIT,0,Integer.parseInt(s.image));
+            midCodeList.add(code);
+}
+    |
+        <LPA> Expression() <RPA>
+    )
+}
